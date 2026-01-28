@@ -84,7 +84,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: team-1-nodeapp-prod
-          slot-name: canary
+          slot-name: green
           package: app.zip
 
 #------------------------------------------------
@@ -142,3 +142,4 @@ jobs:
             --name team-1-nodeapp-prod \
             --slot green \
             --target-slot production
+
