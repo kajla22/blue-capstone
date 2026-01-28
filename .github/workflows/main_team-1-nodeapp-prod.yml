@@ -1,4 +1,7 @@
-name: Blue-Green + Canary Deployment - Node.js App
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy Node.js app to Azure Web App - team-1-nodeapp-prod
 
 on:
   push:
@@ -6,142 +9,47 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
-#------------------------------------------------
-# BUILD JOB
-#------------------------------------------------
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read #This is required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      - run: npm install
-      - run: npm run test --if-present
+      - name: npm install, build, and test
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
 
-      - name: Package app
-        run: zip -r app.zip .
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: app.zip
+          path: .
 
-#------------------------------------------------
-# DEPLOY TO GREEN SLOT
-#------------------------------------------------
-  deploy-green:
+  deploy:
     runs-on: ubuntu-latest
     needs: build
-
+    
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
         with:
           name: node-app
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy to GREEN slot
+      
+      - name: 'Deploy to Azure Web App'
+        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: team-1-nodeapp-prod
-          slot-name: green
-          package: app.zip
-
-#------------------------------------------------
-# DEPLOY TO CANARY SLOT
-#------------------------------------------------
-  deploy-canary:
-    runs-on: ubuntu-latest
-    needs: deploy-green
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: node-app
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy to CANARY slot
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: team-1-nodeapp-prod
-          slot-name: green
-          package: app.zip
-
-#------------------------------------------------
-# SHIFT TRAFFIC TO CANARY (90% PROD / 10% CANARY)
-#------------------------------------------------
-  set-canary-traffic:
-    runs-on: ubuntu-latest
-    needs: deploy-canary
-
-    steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set Front Door Canary Weights
-        run: |
-          az afd origin update \
-            --resource-group Team-1-Capstone \
-            --profile-name fd-capstone-profile \
-            --origin-group-name app-origin-group \
-            --origin-name app-origin \
-            --weight 900
-
-          az afd origin update \
-            --resource-group Team-1-Capstone \
-            --profile-name fd-capstone-profile \
-            --origin-group-name app-origin-group \
-            --origin-name app-origin-green \
-            --weight 100
-
-#------------------------------------------------
-# MANUAL PROMOTION: GREEN → PRODUCTION
-#------------------------------------------------
-  promote-to-production:
-    name: Promote GREEN → Production
-    runs-on: ubuntu-latest
-    needs: set-canary-traffic
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-
-    steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Swap GREEN with Production
-        run: |
-          az webapp deployment slot swap \
-            --resource-group Team-1-Capstone \
-            --name team-1-nodeapp-prod \
-            --slot green \
-            --target-slot production
-
-
-
+          app-name: 'team-1-nodeapp-prod'
+          slot-name: 'Production'
+          package: .
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_59A7F82BDD90467BA076E1075BF4A05F }}
