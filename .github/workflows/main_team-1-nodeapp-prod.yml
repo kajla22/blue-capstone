@@ -115,7 +115,7 @@ jobs:
             --resource-group Team-1-Capstone \
             --profile-name fd-capstone-profile \
             --origin-group-name app-origin-group \
-            --origin-name app-origin-canary \
+            --origin-name app-origin-green \
             --weight 100
 
 #------------------------------------------------
@@ -142,4 +142,5 @@ jobs:
             --name team-1-nodeapp-prod \
             --slot green \
             --target-slot production
+
 
